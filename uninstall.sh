@@ -9,10 +9,15 @@ MKINITCPIO_DIRTY=0
 GRUB_DIRTY=0
 REBOOT_REQUIRED=0
 
+CAP_MODULE_NAME="aorus-cap"
+CAP_MODULE_VERSION="0.1"
+
 best_effort_runtime_rollback() {
   local installed_bridge_bin="${USR_LOCAL_BIN_DIR}/aorus-bridge"
   local module
-  local -a modules=(nvidia_uvm nvidia_drm nvidia_modeset nvidia)
+  # aorus_cap is unloaded last, after the bridge restore has used it (under
+  # lockdown the restore delegates the bit-5 clear to this same module).
+  local -a modules=(nvidia_uvm nvidia_drm nvidia_modeset nvidia aorus_cap)
   local modprobe_bin="${MODPROBE_BIN:-modprobe}"
 
   if [[ -x "$installed_bridge_bin" ]]; then
@@ -71,9 +76,12 @@ managed_backup_exists() {
 grub_value_has_managed_args() {
   local value="$1"
   local expected_bridge="$2"
-  local token seen_iommu=0 seen_intel_iommu=0 seen_host_reset=0
+  local token seen_iommu_pt=0 seen_host_reset=0
   local seen_aspm=0 seen_clx=0 seen_port_pm=0 seen_bridge=0
-  local suffix_regex='(^| )iommu=off intel_iommu=off thunderbolt.host_reset=false pcie_aspm.policy=performance thunderbolt.clx=0 pcie_port_pm=off pci=resource_alignment=35@([[:xdigit:]:.]+)$'
+  # Must mirror install.sh's `required` array exactly (iommu.passthrough=1, not
+  # the old iommu=off/intel_iommu=off) or uninstall won't recognize the managed
+  # GRUB_CMDLINE_LINUX and will refuse to restore it.
+  local suffix_regex='(^| )iommu.passthrough=1 thunderbolt.host_reset=false pcie_aspm.policy=performance thunderbolt.clx=0 pcie_port_pm=off pci=resource_alignment=35@([[:xdigit:]:.]+)$'
   local -a tokens=()
 
   [[ "$value" =~ $suffix_regex ]] || return 1
@@ -85,16 +93,10 @@ grub_value_has_managed_args() {
     *nvidia* | rd.driver.blacklist=*nvidia* | modprobe.blacklist=*nvidia* | module_blacklist=*nvidia*)
       return 1
       ;;
-    iommu=off)
-      seen_iommu=$((seen_iommu + 1))
+    iommu.passthrough=1)
+      seen_iommu_pt=$((seen_iommu_pt + 1))
       ;;
-    iommu=*)
-      return 1
-      ;;
-    intel_iommu=off)
-      seen_intel_iommu=$((seen_intel_iommu + 1))
-      ;;
-    intel_iommu=*)
+    iommu.passthrough=*)
       return 1
       ;;
     thunderbolt.host_reset=false)
@@ -130,7 +132,7 @@ grub_value_has_managed_args() {
     esac
   done
 
-  [[ "$seen_iommu" -eq 1 && "$seen_intel_iommu" -eq 1 && "$seen_host_reset" -eq 1 && "$seen_aspm" -eq 1 && "$seen_clx" -eq 1 && "$seen_port_pm" -eq 1 && "$seen_bridge" -eq 1 ]]
+  [[ "$seen_iommu_pt" -eq 1 && "$seen_host_reset" -eq 1 && "$seen_aspm" -eq 1 && "$seen_clx" -eq 1 && "$seen_port_pm" -eq 1 && "$seen_bridge" -eq 1 ]]
 }
 
 mkinitcpio_has_managed_edits() {
@@ -276,8 +278,28 @@ restore_or_remove_repo_owned_artifacts() {
   done < <(repo_owned_artifact_paths)
 }
 
+# Remove the aorus_cap DKMS module (built + installed only under Secure Boot by
+# install.sh). dkms remove --all drops it for every kernel and deletes the built
+# objects; the staged source tree under /usr/src is removed separately.
+remove_cap_module() {
+  local spec="-m ${CAP_MODULE_NAME} -v ${CAP_MODULE_VERSION}"
+  local src="${DKMS_SRC_DIR}/${CAP_MODULE_NAME}-${CAP_MODULE_VERSION}"
+
+  if command -v "$DKMS_BIN" >/dev/null 2>&1 && "$DKMS_BIN" status $spec 2>/dev/null | grep -q .; then
+    run_quiet_action "removing DKMS module ${CAP_MODULE_NAME}/${CAP_MODULE_VERSION}" \
+      "$DKMS_BIN" remove $spec --all || true
+  fi
+
+  if [[ -d "$src" ]]; then
+    run_action "removing ${src}" rm -rf -- "$src"
+  fi
+}
+
 reload_daemons() {
   run_action 'reloading systemd manager' "$SYSTEMCTL_BIN" daemon-reload
+  if command -v "$UDEVADM_BIN" >/dev/null 2>&1; then
+    run_action 'reloading udev rules' "$UDEVADM_BIN" control --reload-rules
+  fi
 }
 
 main() {
@@ -291,6 +313,7 @@ main() {
   run_quiet_action 'disabling aorus.service' "$SYSTEMCTL_BIN" disable aorus.service || true
 
   best_effort_runtime_rollback
+  remove_cap_module
   restore_managed_initramfs_config
   restore_managed_mutable_file "$GRUB_DEFAULT_PATH" grub_has_managed_edits
   restore_managed_modprobe_tree

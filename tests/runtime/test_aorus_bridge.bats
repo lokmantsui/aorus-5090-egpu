@@ -140,7 +140,7 @@ test_apply_fails_when_lnkctl2_write_fails() {
     write_fake_setpci "$fake_setpci" fail-first-write
 
     if run_script_capture "$stdout_file" "$stderr_file" \
-      env SETPCI_BIN="$fake_setpci" BRIDGE="$fake_bridge" FORCE_TB=1 \
+      env SETPCI_BIN="$fake_setpci" BRIDGE="$fake_bridge" FORCE_TB=1 LOCKDOWN_PATH=/dev/null \
       bash "$script" apply; then
         printf 'expected apply to fail when the LnkCtl2 write fails\n' >&2
         return 1
@@ -162,7 +162,7 @@ test_status_fails_when_lnksta_read_fails() {
     write_fake_setpci "$fake_setpci" fail-status-read
 
     if run_script_capture "$stdout_file" "$stderr_file" \
-      env SETPCI_BIN="$fake_setpci" BRIDGE="$fake_bridge" FORCE_TB=1 \
+      env SETPCI_BIN="$fake_setpci" BRIDGE="$fake_bridge" FORCE_TB=1 LOCKDOWN_PATH=/dev/null \
       bash "$script" status; then
         printf 'expected status to fail when LnkSta cannot be read\n' >&2
         return 1
@@ -184,7 +184,7 @@ test_restore_reports_target_is_left_unchanged() {
     write_fake_setpci "$fake_setpci" restore-ok
 
     if ! run_script_capture "$stdout_file" "$stderr_file" \
-      env SETPCI_BIN="$fake_setpci" BRIDGE="$fake_bridge" FORCE_TB=1 \
+      env SETPCI_BIN="$fake_setpci" BRIDGE="$fake_bridge" FORCE_TB=1 LOCKDOWN_PATH=/dev/null \
       bash "$script" restore; then
         printf 'expected restore to succeed with fake setpci\n' >&2
         printf 'stderr:\n' >&2

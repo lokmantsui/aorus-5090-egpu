@@ -21,6 +21,9 @@ UPDATE_INITRAMFS_BIN="${UPDATE_INITRAMFS_BIN:-update-initramfs}"
 INITRAMFS_BACKEND="${INITRAMFS_BACKEND:-}"
 GRUB_MKCONFIG_BIN="${GRUB_MKCONFIG_BIN:-grub-mkconfig}"
 SYSTEMCTL_BIN="${SYSTEMCTL_BIN:-systemctl}"
+UDEVADM_BIN="${UDEVADM_BIN:-udevadm}"
+DKMS_BIN="${DKMS_BIN:-dkms}"
+DKMS_SRC_DIR="${DKMS_SRC_DIR:-/usr/src}"
 INSTALL_BIN="${INSTALL_BIN:-install}"
 AORUS_BRIDGE_BIN="${AORUS_BRIDGE_BIN:-${REPO_ROOT}/aorus-bridge}"
 INSTALL_REPO_FILE_UNCHANGED=10
@@ -256,5 +259,6 @@ repo_owned_artifact_paths() {
     "${USR_LOCAL_BIN_DIR}/aorus-modules" \
     "${MODPROBE_DIR}/aorus.conf" \
     "${SYSTEMD_ROOT}/aorus.service" \
-    "${SYSTEMD_ROOT}/nvidia-persistenced.service.d/aorus.conf"
+    "${SYSTEMD_ROOT}/nvidia-persistenced.service.d/aorus.conf" \
+    "${UDEV_RULES_DIR}/99-aorus-egpu.rules"
 }

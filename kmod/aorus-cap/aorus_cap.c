@@ -37,7 +37,7 @@ MODULE_PARM_DESC(target, "Target Link Speed generation 1-4 (0 = leave unchanged)
 
 static bool bit5 = true;
 module_param(bit5, bool, 0444);
-MODULE_PARM_DESC(bit5, "Set LnkCtl2 Hardware Autonomous Speed Disable (bit 5)");
+MODULE_PARM_DESC(bit5, "LnkCtl2 Hardware Autonomous Speed Disable (bit 5): 1=set (apply), 0=clear (restore)");
 
 static bool retrain = true;
 module_param(retrain, bool, 0444);
@@ -93,8 +93,13 @@ static int __init aorus_cap_init(void)
 	}
 
 	new2 = lnkctl2;
+	/* bit5 is authoritative: set it on apply (bit5=1), clear it on restore
+	 * (bit5=0). This lets the same module drive both aorus-bridge paths.
+	 */
 	if (bit5)
 		new2 |= PCI_EXP_LNKCTL2_HASD;
+	else
+		new2 &= ~PCI_EXP_LNKCTL2_HASD;
 	if (target >= 1) {
 		new2 &= ~PCI_EXP_LNKCTL2_TLS;
 		new2 |= (target & PCI_EXP_LNKCTL2_TLS);

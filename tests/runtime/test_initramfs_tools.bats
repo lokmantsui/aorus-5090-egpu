@@ -109,6 +109,10 @@ run_script() {
   # to the initramfs-tools backend.
   env \
     AORUS_SETUP_ALLOW_NON_ROOT=1 \
+    AORUS_CAP_MODULE=never \
+    UDEVADM_BIN=true \
+    DKMS_BIN=false \
+    DKMS_SRC_DIR="${root}/usr/src" \
     PATH="${root}/bin:/usr/bin:/bin" \
     ETC_ROOT="${root}/etc" \
     MODPROBE_DIR="${root}/etc/modprobe.d" \

@@ -325,22 +325,28 @@ want_cap_module() {
 # Ubuntu auto-signs with the enrolled MOK (/var/lib/shim-signed/mok), so the
 # module loads under Secure Boot like the nvidia modules.
 install_cap_module() {
-  local src="/usr/src/${CAP_MODULE_NAME}-${CAP_MODULE_VERSION}"
+  local src="${DKMS_SRC_DIR}/${CAP_MODULE_NAME}-${CAP_MODULE_VERSION}"
   local spec="-m ${CAP_MODULE_NAME} -v ${CAP_MODULE_VERSION}"
 
-  require_tool dkms 'dkms'
+  require_tool "$DKMS_BIN" 'dkms'
 
+  # DKMS keys builds on version, not source content, so a prior registration of
+  # this version would install stale objects even after the source changes.
+  # Drop any existing registration first so the freshly staged source rebuilds.
+  if "$DKMS_BIN" status $spec 2>/dev/null | grep -q .; then
+    run_action "removing prior ${CAP_MODULE_NAME}/${CAP_MODULE_VERSION}" \
+      "$DKMS_BIN" remove $spec --all || return $?
+  fi
+
+  ensure_directory "$src"
   run_action "staging ${CAP_MODULE_NAME} source to ${src}" \
     cp -a "${REPO_ROOT}/kmod/aorus-cap/." "$src" || return $?
 
-  # dkms add is a no-op error if already registered; ignore that case.
-  if ! dkms status $spec 2>/dev/null | grep -q .; then
-    run_action "dkms add ${CAP_MODULE_NAME}/${CAP_MODULE_VERSION}" \
-      dkms add $spec || return $?
-  fi
+  run_action "dkms add ${CAP_MODULE_NAME}/${CAP_MODULE_VERSION}" \
+    "$DKMS_BIN" add $spec || return $?
 
   run_action "dkms install (build + MOK-sign) ${CAP_MODULE_NAME}/${CAP_MODULE_VERSION}" \
-    dkms install --force $spec || return $?
+    "$DKMS_BIN" install --force $spec || return $?
 }
 
 install_host_files() {
@@ -375,8 +381,8 @@ install_host_files() {
 reload_daemons() {
   run_action 'reloading systemd manager' "$SYSTEMCTL_BIN" daemon-reload
   run_action 'enabling aorus.service' "$SYSTEMCTL_BIN" enable aorus.service
-  if command -v udevadm >/dev/null 2>&1; then
-    run_action 'reloading udev rules' udevadm control --reload-rules
+  if command -v "$UDEVADM_BIN" >/dev/null 2>&1; then
+    run_action 'reloading udev rules' "$UDEVADM_BIN" control --reload-rules
   fi
 }
 

@@ -324,12 +324,32 @@ cmd_apply() {
     fi
 }
 
+# Delegate the restore (clear bit 5) to the signed aorus_cap module. bit5=0 is
+# authoritative in the module, so it clears the bit; target=0 leaves the Target
+# Link Speed alone and retrain=0 avoids disturbing the live link.
+restore_via_module() {
+    yellow "bridge=${BRIDGE}  kernel lockdown active — clearing cap via signed ${CAP_MODULE} module"
+    "$MODPROBE_BIN" -r "$CAP_MODULE" 2>/dev/null || true
+    if "$MODPROBE_BIN" "$CAP_MODULE" \
+        bridge="$BRIDGE" target=0 bit5=0 retrain=0 2>/dev/null; then
+        yellow "  ${CAP_MODULE} loaded (bit 5 cleared); see 'dmesg | grep aorus_cap' for the result"
+    else
+        red "could not load ${CAP_MODULE} to clear the cap on ${BRIDGE}"
+        exit 2
+    fi
+}
+
 cmd_restore() {
     # Clear bit 5 of LnkCtl2 (re-enable hardware autonomous speed
     # changes). This reverts the cap. If CAP_TARGET_SPEED was set on a
     # previous apply, we don't try to remember + restore the original
     # Target Link Speed — the original is whatever the bridge had at
     # cold-boot, which we don't track.
+    if is_locked_down; then
+        restore_via_module
+        return
+    fi
+
     local cur cur_int new_int new_hex
     if ! cur=$(read_word "$LNKCTL2_OFFSET" "LnkCtl2"); then
         exit 2

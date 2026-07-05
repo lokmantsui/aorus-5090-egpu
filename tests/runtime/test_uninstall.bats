@@ -97,6 +97,9 @@ run_uninstall_with_args() {
 
   env \
     AORUS_SETUP_ALLOW_NON_ROOT=1 \
+    UDEVADM_BIN=true \
+    DKMS_BIN=false \
+    DKMS_SRC_DIR="${root}/usr/src" \
     PATH="${root}/bin:${PATH}" \
     ETC_ROOT="${root}/etc" \
     MODPROBE_DIR="${root}/etc/modprobe.d" \
@@ -170,8 +173,8 @@ HOOKS=(base fsck)
 EOF
 
   cat >"${root}/etc/default/grub" <<'EOF'
-GRUB_CMDLINE_LINUX_DEFAULT="quiet splash iommu=off intel_iommu=off thunderbolt.host_reset=false pcie_aspm.policy=performance thunderbolt.clx=0 pcie_port_pm=off pci=resource_alignment=35@0000:03:00.0"
-GRUB_CMDLINE_LINUX="iommu=off intel_iommu=off thunderbolt.host_reset=false pcie_aspm.policy=performance thunderbolt.clx=0 pcie_port_pm=off pci=resource_alignment=35@0000:03:00.0"
+GRUB_CMDLINE_LINUX_DEFAULT="quiet splash iommu.passthrough=1 thunderbolt.host_reset=false pcie_aspm.policy=performance thunderbolt.clx=0 pcie_port_pm=off pci=resource_alignment=35@0000:03:00.0"
+GRUB_CMDLINE_LINUX="iommu.passthrough=1 thunderbolt.host_reset=false pcie_aspm.policy=performance thunderbolt.clx=0 pcie_port_pm=off pci=resource_alignment=35@0000:03:00.0"
 EOF
   cat >"${root}/etc/default/grub.aorus.01" <<'EOF'
 GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"
@@ -351,7 +354,7 @@ test_uninstall_fails_when_canonical_managed_grub_has_no_backup() {
   prepare_fake_root "$tmpdir" "$log_file"
   cat >"${tmpdir}/etc/default/grub" <<'EOF'
 GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"
-GRUB_CMDLINE_LINUX="iommu=off intel_iommu=off thunderbolt.host_reset=false pcie_aspm.policy=performance thunderbolt.clx=0 pcie_port_pm=off pci=resource_alignment=35@0000:03:00.0"
+GRUB_CMDLINE_LINUX="iommu.passthrough=1 thunderbolt.host_reset=false pcie_aspm.policy=performance thunderbolt.clx=0 pcie_port_pm=off pci=resource_alignment=35@0000:03:00.0"
 EOF
   printf 'previous service backup\n' >"${tmpdir}/etc/systemd/system/aorus.service.aorus.00"
 
