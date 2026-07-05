@@ -9,6 +9,13 @@ MKINITCPIO_DIRTY=0
 GRUB_DIRTY=0
 REBOOT_REQUIRED=0
 
+# aorus_cap DKMS module: needed only under Secure Boot, where kernel lockdown
+# bans the setpci write aorus-bridge normally uses. Modes: auto (install iff
+# Secure Boot is enabled), always, never. Override with AORUS_CAP_MODULE=.
+CAP_MODULE_MODE="${AORUS_CAP_MODULE:-auto}"
+CAP_MODULE_NAME="aorus-cap"
+CAP_MODULE_VERSION="0.1"
+
 parse_shell_string_value() {
   local expression="$1"
   local parsed
@@ -299,6 +306,43 @@ install_binaries() {
   fi
 }
 
+secure_boot_enabled() {
+  command -v mokutil >/dev/null 2>&1 || return 1
+  mokutil --sb-state 2>/dev/null | grep -qi 'SecureBoot enabled'
+}
+
+want_cap_module() {
+  case "$CAP_MODULE_MODE" in
+  always) return 0 ;;
+  never) return 1 ;;
+  *) secure_boot_enabled ;;
+  esac
+}
+
+# Build, MOK-sign, and install the aorus_cap DKMS module. Required only under
+# Secure Boot: kernel lockdown then bans the setpci write aorus-bridge uses, so
+# the LnkCtl2 cap must come from a signed in-kernel module instead. DKMS on
+# Ubuntu auto-signs with the enrolled MOK (/var/lib/shim-signed/mok), so the
+# module loads under Secure Boot like the nvidia modules.
+install_cap_module() {
+  local src="/usr/src/${CAP_MODULE_NAME}-${CAP_MODULE_VERSION}"
+  local spec="-m ${CAP_MODULE_NAME} -v ${CAP_MODULE_VERSION}"
+
+  require_tool dkms 'dkms'
+
+  run_action "staging ${CAP_MODULE_NAME} source to ${src}" \
+    cp -a "${REPO_ROOT}/kmod/aorus-cap/." "$src" || return $?
+
+  # dkms add is a no-op error if already registered; ignore that case.
+  if ! dkms status $spec 2>/dev/null | grep -q .; then
+    run_action "dkms add ${CAP_MODULE_NAME}/${CAP_MODULE_VERSION}" \
+      dkms add $spec || return $?
+  fi
+
+  run_action "dkms install (build + MOK-sign) ${CAP_MODULE_NAME}/${CAP_MODULE_VERSION}" \
+    dkms install --force $spec || return $?
+}
+
 install_host_files() {
   local status
 
@@ -315,11 +359,25 @@ install_host_files() {
     status=$?
     [[ "$status" -eq "$INSTALL_REPO_FILE_UNCHANGED" ]] || return "$status"
   fi
+
+  # udev rule that starts aorus.service when the eGPU's PCI function appears.
+  # The eGPU tunnels in over Thunderbolt tens of seconds into boot, after
+  # systemd-udev-settle, so a plain boot-ordered oneshot loses the race; this
+  # binds bring-up to the device's add uevent instead.
+  if install_repo_file "${HOST_FILES_DIR}/etc/udev/rules.d/99-aorus-egpu.rules" "${UDEV_RULES_DIR}/99-aorus-egpu.rules" 0644; then
+    :
+  else
+    status=$?
+    [[ "$status" -eq "$INSTALL_REPO_FILE_UNCHANGED" ]] || return "$status"
+  fi
 }
 
 reload_daemons() {
   run_action 'reloading systemd manager' "$SYSTEMCTL_BIN" daemon-reload
   run_action 'enabling aorus.service' "$SYSTEMCTL_BIN" enable aorus.service
+  if command -v udevadm >/dev/null 2>&1; then
+    run_action 'reloading udev rules' udevadm control --reload-rules
+  fi
 }
 
 main() {
@@ -347,6 +405,9 @@ main() {
   rewrite_modprobe_tree
   rewrite_grub "$bridge"
   install_binaries
+  if want_cap_module; then
+    install_cap_module
+  fi
   install_host_files
   regenerate_if_dirty
   reload_daemons

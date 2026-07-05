@@ -12,3 +12,14 @@
 # Kernel module build artefacts (kernel-modules/*/ build outputs)
 /nvidia-open-dkms-*.pkg.tar.zst
 /nvidia-open-dkms-*.pkg.tar.zst.sig
+
+# In-tree kbuild outputs from kmod/*/ (DKMS builds out-of-tree; these only
+# appear if you run `make` directly for a quick local compile)
+kmod/**/*.o
+kmod/**/*.ko
+kmod/**/*.mod
+kmod/**/*.mod.c
+kmod/**/.*.cmd
+kmod/**/Module.symvers
+kmod/**/modules.order
+kmod/**/.tmp_versions/

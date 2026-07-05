@@ -1,0 +1,12 @@
+# The AORUS eGPU tunnels in over Thunderbolt, so its NVIDIA PCI function (vendor
+# 0x10de, display class 0x03xx) often appears tens of seconds into boot — well
+# after systemd-udev-settle. A one-shot boot service gated on `aorus-bridge
+# detect` therefore loses the race and skips, leaving the bridge cap unapplied
+# and nvidia unloaded (GPU dead). Bind the bring-up to the GPU's own "add"
+# uevent so it fires exactly when the device shows up, at boot or on hotplug.
+#
+# aorus.service is Type=oneshot and idempotent (the cap apply is a no-op when
+# already applied), so a Thunderbolt re-tunnel that re-adds the device just
+# re-runs it harmlessly. The service's own ExecCondition=aorus-bridge detect
+# still guards against spurious triggers.
+ACTION=="add", SUBSYSTEM=="pci", ATTR{vendor}=="0x10de", ATTR{class}=="0x03*", TAG+="systemd", ENV{SYSTEMD_WANTS}+="aorus.service"

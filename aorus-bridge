@@ -76,6 +76,13 @@ DEVICE_ID="${DEVICE_ID:-}"
 GPU_CLASS_PREFIX="${GPU_CLASS_PREFIX:-0x03}"
 SETPCI_BIN="${SETPCI_BIN:-setpci}"
 LSPCI_BIN="${LSPCI_BIN:-lspci}"
+MODPROBE_BIN="${MODPROBE_BIN:-modprobe}"
+# Path used to probe kernel lockdown state. Under Secure Boot the kernel runs
+# in lockdown "integrity" mode, which bans userspace PCI config-space writes
+# (setpci) but still allows reads. When locked down we delegate the LnkCtl2
+# write to the MOK-signed aorus_cap kernel module instead of setpci.
+LOCKDOWN_PATH="${LOCKDOWN_PATH:-/sys/kernel/security/lockdown}"
+CAP_MODULE="${CAP_MODULE:-aorus_cap}"
 PCI_SYSFS_ROOT="${PCI_SYSFS_ROOT:-/sys/bus/pci/devices}"
 
 # CAP_TARGET_SPEED: defaults to Gen3 + bit 5.
@@ -243,7 +250,38 @@ write_word() {
     fi
 }
 
+# True if the kernel is in lockdown (Secure Boot → "integrity"/"confidentiality"
+# mode). In that state userspace setpci writes to config space are refused, so
+# the cap has to be applied from the signed aorus_cap module instead.
+is_locked_down() {
+    [[ -r "$LOCKDOWN_PATH" ]] || return 1
+    grep -qE '\[(integrity|confidentiality)\]' "$LOCKDOWN_PATH"
+}
+
+# Delegate the LnkCtl2 write (+retrain) to the MOK-signed aorus_cap module. The
+# module does its own read-modify-write and is idempotent (no change → no
+# retrain); it only acts at init, so reload to re-run with fresh params.
+apply_via_module() {
+    local speed="$TARGET_SPEED_OVERRIDE"
+    [[ -n "$speed" ]] || speed=0
+    green "bridge=${BRIDGE}  kernel lockdown active — applying cap via signed ${CAP_MODULE} module"
+    "$MODPROBE_BIN" -r "$CAP_MODULE" 2>/dev/null || true
+    if "$MODPROBE_BIN" "$CAP_MODULE" \
+        bridge="$BRIDGE" target="$speed" bit5=1 retrain=1 2>/dev/null; then
+        green "  ${CAP_MODULE} loaded (target=Gen${speed}); see 'dmesg | grep aorus_cap' for the write result"
+    else
+        red "could not load ${CAP_MODULE} (is the DKMS module built, installed, and MOK-signed?)"
+        red "under Secure Boot setpci cannot write config space, so this module is required"
+        exit 2
+    fi
+}
+
 cmd_apply() {
+    if is_locked_down; then
+        apply_via_module
+        return
+    fi
+
     local cur
     if ! cur=$(read_word "$LNKCTL2_OFFSET" "LnkCtl2"); then
         exit 2
