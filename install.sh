@@ -153,7 +153,7 @@ rewrite_initramfs_modules() {
 
 rewrite_modprobe_file() {
   local file="$1"
-  local tmp_file line changed=0
+  local tmp_file line first changed=0
   tmp_file="$(mktemp)"
 
   while IFS= read -r line || [[ -n "$line" ]]; do
@@ -163,8 +163,18 @@ rewrite_modprobe_file() {
     fi
 
     if [[ "$line" == *nvidia* ]]; then
-      printf '# aorus-disabled: %s\n' "$line" >>"$tmp_file"
-      changed=1
+      # Only neutralize directives that could LOAD or configure the nvidia
+      # modules ahead of the bridge cap (options/install/softdep/alias/...).
+      # `blacklist` lines only ever PREVENT auto-loading, which is exactly what
+      # we want — including the distro's `blacklist nvidiafb`. Commenting those
+      # out would let the legacy nvidiafb driver seize the eGPU at boot.
+      read -r first _ <<<"$line"
+      if [[ "$first" == "blacklist" ]]; then
+        printf '%s\n' "$line" >>"$tmp_file"
+      else
+        printf '# aorus-disabled: %s\n' "$line" >>"$tmp_file"
+        changed=1
+      fi
       continue
     fi
 

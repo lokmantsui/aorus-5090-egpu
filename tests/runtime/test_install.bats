@@ -214,6 +214,7 @@ EOF
   cat >"${root}/etc/modprobe.d/existing.conf" <<'EOF'
 options nvidia NVreg_Foo=1
 softdep nvidia pre: something
+blacklist nvidiafb
 options snd_hda_intel power_save=1
 EOF
 
@@ -311,6 +312,10 @@ EOF
   assert_contains '# aorus-disabled: options nvidia NVreg_Foo=1' "${tmpdir}/etc/modprobe.d/existing.conf"
   assert_contains '# aorus-disabled: softdep nvidia pre: something' "${tmpdir}/etc/modprobe.d/existing.conf"
   assert_contains 'options snd_hda_intel power_save=1' "${tmpdir}/etc/modprobe.d/existing.conf"
+  # blacklist lines only prevent auto-loading, so they must be preserved verbatim
+  # (in particular the distro's `blacklist nvidiafb`), not commented out.
+  assert_contains 'blacklist nvidiafb' "${tmpdir}/etc/modprobe.d/existing.conf"
+  assert_not_contains '# aorus-disabled: blacklist nvidiafb' "${tmpdir}/etc/modprobe.d/existing.conf"
 }
 
 test_grub_is_canonicalized_with_detected_bridge() {
