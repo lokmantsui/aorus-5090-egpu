@@ -159,7 +159,7 @@ EOF
   assert_file_exists "${root}/etc/systemd/system/aorus.service"
 
   # GRUB still gets the managed power-management args.
-  assert_contains 'pcie_aspm.policy=performance thunderbolt.clx=0 pcie_port_pm=off' "${root}/etc/default/grub"
+  assert_contains 'thunderbolt.host_reset=false thunderbolt.clx=0' "${root}/etc/default/grub"
 }
 
 test_install_then_uninstall_round_trips_initramfs_tools_host() {

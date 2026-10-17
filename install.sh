@@ -222,9 +222,7 @@ canonicalize_cmdline() {
   local required=(
     "iommu.passthrough=1"
     "thunderbolt.host_reset=false"
-    "pcie_aspm.policy=performance"
     "thunderbolt.clx=0"
-    "pcie_port_pm=off"
     "pci=resource_alignment=35@${bridge}"
   )
 
@@ -236,7 +234,7 @@ canonicalize_cmdline() {
 
   for token in "${tokens[@]}"; do
     case "$token" in
-    *nvidia* | rd.driver.blacklist=*nvidia* | modprobe.blacklist=*nvidia* | module_blacklist=*nvidia* | iommu=* | intel_iommu=* | iommu.passthrough=* | thunderbolt.host_reset=* | pcie_aspm.policy=* | thunderbolt.clx=* | pcie_port_pm=* | pci=resource_alignment=35@*)
+    *nvidia* | rd.driver.blacklist=*nvidia* | modprobe.blacklist=*nvidia* | module_blacklist=*nvidia* | iommu=* | intel_iommu=* | iommu.passthrough=* | thunderbolt.host_reset=* | pcie_aspm.policy=performance | thunderbolt.clx=* | pcie_port_pm=off | pci=resource_alignment=35@*)
       ;;
     *)
       filtered+=("$token")

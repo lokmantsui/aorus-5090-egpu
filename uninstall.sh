@@ -77,11 +77,11 @@ grub_value_has_managed_args() {
   local value="$1"
   local expected_bridge="$2"
   local token seen_iommu_pt=0 seen_host_reset=0
-  local seen_aspm=0 seen_clx=0 seen_port_pm=0 seen_bridge=0
+  local seen_clx=0 seen_bridge=0
   # Must mirror install.sh's `required` array exactly (iommu.passthrough=1, not
   # the old iommu=off/intel_iommu=off) or uninstall won't recognize the managed
   # GRUB_CMDLINE_LINUX and will refuse to restore it.
-  local suffix_regex='(^| )iommu.passthrough=1 thunderbolt.host_reset=false pcie_aspm.policy=performance thunderbolt.clx=0 pcie_port_pm=off pci=resource_alignment=35@([[:xdigit:]:.]+)$'
+  local suffix_regex='(^| )iommu.passthrough=1 thunderbolt.host_reset=false thunderbolt.clx=0 pci=resource_alignment=35@([[:xdigit:]:.]+)$'
   local -a tokens=()
 
   [[ "$value" =~ $suffix_regex ]] || return 1
@@ -105,22 +105,10 @@ grub_value_has_managed_args() {
     thunderbolt.host_reset=*)
       return 1
       ;;
-    pcie_aspm.policy=performance)
-      seen_aspm=$((seen_aspm + 1))
-      ;;
-    pcie_aspm.policy=*)
-      return 1
-      ;;
     thunderbolt.clx=0)
       seen_clx=$((seen_clx + 1))
       ;;
     thunderbolt.clx=*)
-      return 1
-      ;;
-    pcie_port_pm=off)
-      seen_port_pm=$((seen_port_pm + 1))
-      ;;
-    pcie_port_pm=*)
       return 1
       ;;
     pci=resource_alignment=35@"$expected_bridge")
@@ -132,7 +120,7 @@ grub_value_has_managed_args() {
     esac
   done
 
-  [[ "$seen_iommu_pt" -eq 1 && "$seen_host_reset" -eq 1 && "$seen_aspm" -eq 1 && "$seen_clx" -eq 1 && "$seen_port_pm" -eq 1 && "$seen_bridge" -eq 1 ]]
+  [[ "$seen_iommu_pt" -eq 1 && "$seen_host_reset" -eq 1 && "$seen_clx" -eq 1 && "$seen_bridge" -eq 1 ]]
 }
 
 mkinitcpio_has_managed_edits() {

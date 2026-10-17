@@ -334,7 +334,7 @@ test_grub_is_canonicalized_with_detected_bridge() {
   assert_file_content "$(
     cat <<'EOF'
 GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"
-GRUB_CMDLINE_LINUX="iommu.passthrough=1 thunderbolt.host_reset=false pcie_aspm.policy=performance thunderbolt.clx=0 pcie_port_pm=off pci=resource_alignment=35@0000:03:00.0"
+GRUB_CMDLINE_LINUX="pcie_aspm.policy=powersave iommu.passthrough=1 thunderbolt.host_reset=false thunderbolt.clx=0 pci=resource_alignment=35@0000:03:00.0"
 EOF
   )" "${tmpdir}/etc/default/grub"
   assert_contains 'grub-mkconfig -o ' "$log_file"
@@ -360,7 +360,7 @@ EOF
   assert_file_content "$(
     cat <<'EOF'
 GRUB_CMDLINE_LINUX_DEFAULT="quiet splash loglevel=3"
-GRUB_CMDLINE_LINUX="audit=1 iommu.passthrough=1 thunderbolt.host_reset=false pcie_aspm.policy=performance thunderbolt.clx=0 pcie_port_pm=off pci=resource_alignment=35@0000:03:00.0"
+GRUB_CMDLINE_LINUX="audit=1 pcie_aspm.policy=powersave iommu.passthrough=1 thunderbolt.host_reset=false thunderbolt.clx=0 pci=resource_alignment=35@0000:03:00.0"
 EOF
   )" "${tmpdir}/etc/default/grub"
 }
@@ -385,7 +385,7 @@ EOF
   assert_file_content "$(
     cat <<'EOF'
 GRUB_TIMEOUT=3
-GRUB_CMDLINE_LINUX="audit=1 iommu.passthrough=1 thunderbolt.host_reset=false pcie_aspm.policy=performance thunderbolt.clx=0 pcie_port_pm=off pci=resource_alignment=35@0000:03:00.0"
+GRUB_CMDLINE_LINUX="audit=1 iommu.passthrough=1 thunderbolt.host_reset=false thunderbolt.clx=0 pci=resource_alignment=35@0000:03:00.0"
 GRUB_CMDLINE_LINUX_DEFAULT=""
 EOF
   )" "${tmpdir}/etc/default/grub"
@@ -411,7 +411,7 @@ EOF
   assert_file_content "$(
     cat <<'EOF'
 GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"
-GRUB_CMDLINE_LINUX="audit=1 iommu.passthrough=1 thunderbolt.host_reset=false pcie_aspm.policy=performance thunderbolt.clx=0 pcie_port_pm=off pci=resource_alignment=35@0000:03:00.0"
+GRUB_CMDLINE_LINUX="audit=1 pcie_aspm.policy=powersave iommu.passthrough=1 thunderbolt.host_reset=false thunderbolt.clx=0 pci=resource_alignment=35@0000:03:00.0"
 EOF
   )" "${tmpdir}/etc/default/grub"
 }
